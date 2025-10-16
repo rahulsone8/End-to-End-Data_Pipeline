@@ -134,7 +134,7 @@
 				]
 			},
 			{
-				"name": "Script1",
+				"name": "Max_cdc",
 				"type": "Script",
 				"dependsOn": [
 					{
@@ -161,13 +161,82 @@
 						{
 							"type": "Query",
 							"text": {
-								"value": "SELECT max(@{pipeline().parameters.cdc_col}) FROM @{pipeline().parameters.Schema}.@{pipeline().parameters.table}",
+								"value": "SELECT max(@{pipeline().parameters.cdc_col}) as cdc FROM @{pipeline().parameters.Schema}.@{pipeline().parameters.table}",
 								"type": "Expression"
 							}
 						}
 					],
 					"scriptBlockExecutionTimeout": "02:00:00"
 				}
+			},
+			{
+				"name": "update_last_cdc",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Max_cdc",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"additionalColumns": {
+							"type": "Expression",
+							"value": "@activity('Max_cdc').output.resultsets[0].rows[0].cdc"
+						},
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"sink": {
+						"type": "JsonSink",
+						"storeSettings": {
+							"type": "AzureBlobFSWriteSettings"
+						},
+						"formatSettings": {
+							"type": "JsonWriteSettings"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "Json1",
+						"type": "DatasetReference",
+						"parameters": {
+							"container": "bronze",
+							"folder": "cdc",
+							"file": "empty.json"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "Json1",
+						"type": "DatasetReference",
+						"parameters": {
+							"container": "bronze",
+							"folder": "cdc",
+							"file": "cdc.json"
+						}
+					}
+				]
 			}
 		],
 		"parameters": {
